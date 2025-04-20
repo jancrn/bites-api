@@ -29,7 +29,7 @@ uv pip install -r requirements.txt
 ### 4. Run the development server
 
 ```bash
-fastapi dev main.py
+fastapi dev src/main.py
 ```
 
 ## When adding a new dependency
