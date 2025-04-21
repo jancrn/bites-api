@@ -3,7 +3,8 @@ from typing import Annotated
 from dotenv import load_dotenv
 from fastapi import Depends
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
+from sqlmodel import SQLModel
 
 import env
 
@@ -28,9 +29,8 @@ def get_db():
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-# Base class for declarative models
-Base = declarative_base()
-
-
-# Create all tables in the database
-Base.metadata.create_all(bind=engine)
+def init_db():
+    SQLModel.metadata.create_all(
+        bind=engine,
+        checkfirst=True,
+    )
