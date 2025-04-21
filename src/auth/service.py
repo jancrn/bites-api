@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid1
 
 import jwt
 from fastapi import Depends
@@ -18,9 +18,21 @@ from user.models import User
 
 
 def signup(user: SignUpUserRequest, db: Session) -> User:
+    if not user.password:
+        raise AuthenticationError("Password is required")
+    if not user.email:
+        raise AuthenticationError("Email is required")
+    if not user.first_name:
+        raise AuthenticationError("First name is required")
+    if not user.last_name:
+        raise AuthenticationError("Last name is required")
+    user_exists = user_repository.get_user_by_email(db, user.email)
+    if user_exists:
+        raise AuthenticationError("User already exists")
+
     return auth_repository.create_user(
         db,
-        id=UUID(),
+        id=uuid1(),
         token="",
         name=user.first_name + " " + user.last_name,
         email=user.email,
@@ -54,7 +66,7 @@ def create_access_token(email: str, user_id: UUID, expires_delta: timedelta) -> 
 def signin(form_data: SignInUserRequest, db: Session) -> Token:
     user = user_repository.get_user_by_email(db, form_data.username)
     if not user:
-        raise AuthenticationError("User not found")
+        raise AuthenticationError("User with this email does not exist")
 
     # if not user.email_verified_at:
     #     raise AuthenticationError("Email not verified")
