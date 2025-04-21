@@ -1,13 +1,19 @@
+from typing import Annotated
 from uuid import UUID
 
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
 
-class RegisterUserRequest(BaseModel):
+class SignUpUserRequest(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
     password: str
+
+
+SignInUserRequest = Annotated[OAuth2PasswordRequestForm, Depends()]
 
 
 class Token(BaseModel):

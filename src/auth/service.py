@@ -5,23 +5,19 @@ from uuid import UUID
 
 import jwt
 from fastapi import Depends
-from fastapi.security import OAuth2PasswordRequestForm
 from jwt import PyJWTError
 from sqlalchemy.orm import Session
 
+import env
 from auth import repository as auth_repository
 from auth.config import bcrypt_context, oauth2_bearer
 from auth.exceptions import AuthenticationError
-from auth.models import RegisterUserRequest, Token, TokenData
+from auth.models import SignInUserRequest, SignUpUserRequest, Token, TokenData
 from user import repository as user_repository
 from user.models import User
 
-SECRET_KEY = "197b2c37c391bed93fe80344fe73b806947a65e36206e05a1a23c2fa12702fe3"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-
-def signup(user: RegisterUserRequest, db: Session) -> User:
+def signup(user: SignUpUserRequest, db: Session) -> User:
     return auth_repository.create_user(
         db,
         id=UUID(),
@@ -50,14 +46,12 @@ def create_access_token(email: str, user_id: UUID, expires_delta: timedelta) -> 
             "id": str(user_id),
             "exp": datetime.now(timezone.utc) + expires_delta,
         },
-        SECRET_KEY,
-        algorithm=ALGORITHM,
+        env.get("SECRET_KEY"),
+        env.get("ALGORITHM"),
     )
 
 
-def signin(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: Session
-) -> Token:
+def signin(form_data: SignInUserRequest, db: Session) -> Token:
     user = user_repository.get_user_by_email(db, form_data.username)
     if not user:
         raise AuthenticationError("User not found")
@@ -72,14 +66,18 @@ def signin(
         raise AuthenticationError("Incorrect password")
 
     token = create_access_token(
-        user.email, user.id, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        user.email,
+        user.id,
+        timedelta(minutes=env.get_int("ACCESS_TOKEN_EXPIRE_MINUTES")),
     )
     return Token(access_token=token, token_type="bearer")
 
 
 def verify_token(token: str) -> TokenData:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, env.get("SECRET_KEY"), algorithms=[env.get("ALGORITHM")]
+        )
         user_id: str = payload.get("id")
         return TokenData(user_id=user_id)
     except PyJWTError as e:

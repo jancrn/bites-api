@@ -6,6 +6,6 @@ app = FastAPI()
 
 app.include_router(
     auth_router,
-    prefix="/api",
+    prefix="/v1/api",
     tags=["auth"],
 )

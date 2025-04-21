@@ -5,16 +5,15 @@ from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
+import env
+
 load_dotenv()
 
 
-DATABASE_URL = "postgresql://postgres:postgres@db:5432/fastapi"
+engine = create_engine(env.get("DATABASE_URL"))
 
-engine = create_engine(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
 
 
 def get_db():
@@ -25,4 +24,13 @@ def get_db():
         db.close()
 
 
+# Type alias for the database session
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+# Base class for declarative models
+Base = declarative_base()
+
+
+# Create all tables in the database
+Base.metadata.create_all(bind=engine)
