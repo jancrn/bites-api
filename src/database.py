@@ -30,7 +30,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 def init_db():
-    SQLModel.metadata.create_all(
-        bind=engine,
-        checkfirst=True,
-    )
+    if env.get("DEV_MODE") == "True":
+        print("Initializing database...")
+        SQLModel.metadata.drop_all(bind=engine)
+        SQLModel.metadata.create_all(bind=engine)

@@ -1,30 +1,38 @@
-from typing import Annotated
-from uuid import UUID
+from datetime import datetime
+from typing import List
 
-from fastapi import Depends
-from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 
 
-class SignUpUserRequest(BaseModel):
+class CreateUserRequest(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
     password: str
+    firebase_uuid: str
 
 
-SignInUserRequest = Annotated[OAuth2PasswordRequestForm, Depends()]
+class FirebaseToken(BaseModel):
+    class FirebaseInfo(BaseModel):
+        class FirebaseIdentities(BaseModel):
+            email: List[str] = []
 
+        identities: FirebaseIdentities
+        sign_in_provider: str
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+    iss: str
+    aud: str
+    auth_time: int
+    user_id: str
+    sub: str
+    iat: int
+    exp: int
+    email: str
+    email_verified: bool
+    firebase: FirebaseInfo
 
+    def get(self, key: str) -> str | bool:
+        return getattr(self, key)
 
-class TokenData(BaseModel):
-    user_id: str | None = None
-
-    def get_uuid(self) -> UUID | None:
-        if self.user_id:
-            return UUID(self.user_id)
-        return None
+    def is_expired(self) -> bool:
+        return datetime.now().timestamp() > self.exp

@@ -4,14 +4,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import env
+from auth.config import init_firebase
 from auth.controller import router as auth_router
 from database import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    init_firebase()
     init_db()
+    yield
 
 
 app = FastAPI(
@@ -19,6 +21,8 @@ app = FastAPI(
     description=env.get("APP_DESCRIPTION"),
     version=env.get("APP_VERSION"),
     lifespan=lifespan,
+    openapi_url="/openapi.json",
+    docs_url="/docs",
 )
 
 app.add_middleware(
@@ -32,6 +36,6 @@ app.add_middleware(
 
 app.include_router(
     auth_router,
-    prefix="/v1/api",
+    prefix="/api",
     tags=["auth"],
 )

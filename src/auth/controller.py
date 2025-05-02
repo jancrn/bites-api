@@ -1,39 +1,37 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
-from starlette import status
+from fastapi import APIRouter
 
 from auth import service as auth_service
-from auth.config import oauth2_bearer
-from auth.models import SignInUserRequest, SignUpUserRequest, Token
+from auth.exceptions import AuthenticationError
+from auth.models import CreateUserRequest
+from auth.service import CurrentUser, IsAuthenticated
 from database import DbSession
 from user.models import User
 
-router = APIRouter()
-
-
-@router.post(
-    "/signup",
-    status_code=status.HTTP_201_CREATED,
-    response_model=User,
+router = APIRouter(
+    prefix="/v1/auth",
 )
-async def signup(user: SignUpUserRequest, db: DbSession) -> User:
-    return auth_service.signup(user, db)
-
-
-@router.post(
-    "/signin",
-    status_code=status.HTTP_200_OK,
-    response_model=Token,
-)
-async def signin(form_data: SignInUserRequest, db: DbSession):
-    return auth_service.signin(form_data, db)
 
 
 @router.get(
-    "token",
-    status_code=status.HTTP_200_OK,
+    "/",
     response_model=User,
 )
-async def whoami(token: Annotated[str, Depends(oauth2_bearer)]):
-    return token
+async def get_user(
+    user: CurrentUser,
+):
+    return {"message": f"Hello, {user.email}! Your user ID is {user.id}"}
+
+
+@router.post(
+    "/",
+    response_model=User,
+    status_code=201,
+)
+async def create_user(
+    user: CreateUserRequest,
+    db: DbSession,
+    is_authenticated: IsAuthenticated,
+) -> User:
+    if not is_authenticated:
+        raise AuthenticationError("User is not authenticated")
+    return await auth_service.create_user(user, db)

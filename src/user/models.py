@@ -1,12 +1,15 @@
 from datetime import datetime
-from uuid import UUID
 
 from sqlalchemy import TIMESTAMP
 from sqlmodel import Field, SQLModel
 
 
-class User(SQLModel, table=True):
-    id: UUID = Field(default=None, primary_key=True)
+class User(
+    SQLModel,
+    table=True,
+):
+    id: str | None = Field(default=None, primary_key=True)
+
     token: str = Field(max_length=100, nullable=False)
     name: str = Field(max_length=255, nullable=False)
     email: str = Field(max_length=255, nullable=False, unique=True)

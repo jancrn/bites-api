@@ -1,5 +1,4 @@
 from datetime import datetime
-from uuid import UUID
 
 from database import DbSession
 from user.models import User
@@ -7,7 +6,7 @@ from user.models import User
 
 def create_user(
     db: DbSession,
-    id: UUID,
+    id: str | None,
     token: str,
     name: str,
     email: str,
@@ -38,8 +37,8 @@ def create_user(
         deleted_at=deleted_at,
         phone=phone,
         remember_token=remember_token,
-        created_at=created_at,
-        updated_at=updated_at,
+        created_at=created_at or datetime.now(),
+        updated_at=updated_at or datetime.now(),
         device_token=device_token,
     )
 

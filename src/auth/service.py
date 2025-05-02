@@ -1,23 +1,62 @@
-import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated
-from uuid import UUID, uuid1
 
-import jwt
 from fastapi import Depends
-from jwt import PyJWTError
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from firebase_admin import auth as firebase_auth  # type:ignore[import]
 from sqlalchemy.orm import Session
 
-import env
 from auth import repository as auth_repository
-from auth.config import bcrypt_context, oauth2_bearer
 from auth.exceptions import AuthenticationError
-from auth.models import SignInUserRequest, SignUpUserRequest, Token, TokenData
+from auth.models import CreateUserRequest, FirebaseToken
+from database import DbSession
 from user import repository as user_repository
 from user.models import User
 
 
-def signup(user: SignUpUserRequest, db: Session) -> User:
+async def get_current_user(
+    db: DbSession,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+) -> User:
+    try:
+        decoded_token: FirebaseToken = firebase_auth.verify_id_token(  # type:ignore[no-untyped-call]
+            credentials.credentials
+        )
+        if not decoded_token:
+            raise AuthenticationError("Failed to decode token")
+
+        email = decoded_token.get("email")  # type:ignore[no-untyped-call]
+
+        user: User = user_repository.get_user_by_email(db, email)  # type:ignore[no-untyped-call]
+
+        if not user:
+            raise AuthenticationError("User not found")
+
+        return user  # type:ignore[no-untyped-call]
+    except Exception as e:
+        print(e)
+        raise AuthenticationError("Invalid token - Unknown error")
+
+
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def is_valid_token(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+) -> bool:
+    try:
+        return firebase_auth.verify_id_token(credentials.credentials) is not None  # type:ignore[no-untyped-call]
+    except Exception:
+        return False
+
+
+IsAuthenticated = Annotated[bool, Depends(is_valid_token)]
+
+
+async def create_user(
+    user: CreateUserRequest,
+    db: Session,
+) -> User:
     if not user.password:
         raise AuthenticationError("Password is required")
     if not user.email:
@@ -32,12 +71,12 @@ def signup(user: SignUpUserRequest, db: Session) -> User:
 
     return auth_repository.create_user(
         db,
-        id=uuid1(),
+        id=user.firebase_uuid,
         token="",
         name=user.first_name + " " + user.last_name,
         email=user.email,
         email_verified_at=datetime.now(timezone.utc),
-        password=bcrypt_context.hash(user.password),  # Get Password Hash
+        password="",
         avatar="",
         type=1,
         open_id="",
@@ -49,56 +88,3 @@ def signup(user: SignUpUserRequest, db: Session) -> User:
         updated_at=datetime.now(timezone.utc),
         device_token=None,
     )
-
-
-def create_access_token(email: str, user_id: UUID, expires_delta: timedelta) -> str:
-    return jwt.encode(
-        {
-            "sub": email,
-            "id": str(user_id),
-            "exp": datetime.now(timezone.utc) + expires_delta,
-        },
-        env.get("SECRET_KEY"),
-        env.get("ALGORITHM"),
-    )
-
-
-def signin(form_data: SignInUserRequest, db: Session) -> Token:
-    user = user_repository.get_user_by_email(db, form_data.username)
-    if not user:
-        raise AuthenticationError("User with this email does not exist")
-
-    # if not user.email_verified_at:
-    #     raise AuthenticationError("Email not verified")
-
-    if user.deleted_at:
-        raise AuthenticationError("User account is deleted")
-
-    if not bcrypt_context.verify(form_data.password, user.password):
-        raise AuthenticationError("Incorrect password")
-
-    token = create_access_token(
-        user.email,
-        user.id,
-        timedelta(minutes=env.get_int("ACCESS_TOKEN_EXPIRE_MINUTES")),
-    )
-    return Token(access_token=token, token_type="bearer")
-
-
-def verify_token(token: str) -> TokenData:
-    try:
-        payload = jwt.decode(
-            token, env.get("SECRET_KEY"), algorithms=[env.get("ALGORITHM")]
-        )
-        user_id: str = payload.get("id")
-        return TokenData(user_id=user_id)
-    except PyJWTError as e:
-        logging.warning(f"Token verification failed: {str(e)}")
-        raise AuthenticationError()
-
-
-def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]) -> TokenData:
-    return verify_token(token)
-
-
-CurrentUser = Annotated[TokenData, Depends(get_current_user)]

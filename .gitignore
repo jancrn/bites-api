@@ -84,3 +84,4 @@ secrets.*
 media/
 static/
 uploads/
+firebaseConfig.json

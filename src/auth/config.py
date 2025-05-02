@@ -1,5 +1,8 @@
-from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
+import firebase_admin  # type:ignore[import]
+from firebase_admin import credentials  # type:ignore[import]
 
-oauth2_bearer = OAuth2PasswordBearer(tokenUrl="v1/auth/signin")
-bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def init_firebase():
+    print("Initializing Firebase")
+    cred = credentials.Certificate("firebaseConfig.json")
+    firebase_admin.initialize_app(cred)  # type:ignore[no-untyped-call]
